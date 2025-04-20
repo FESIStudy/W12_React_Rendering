@@ -1,143 +1,103 @@
-# React 렌더링 구조 완전 정복
+## 1. Virtual DOM 개요
 
-## 1. 렌더링 플로우 개요
-
-### 렌더링이란?
-React에서 "렌더링"은 컴포넌트의 상태(state)나 props가 변경될 때 UI를 다시 그려주는 과정을 의미한다. 이 과정은 다음과 같은 단계로 이루어진다:
-
-1. 상태(state)나 props 변경 발생
-2. React가 새로운 Virtual DOM(VDOM) 트리를 생성
-3. 이전 VDOM과 비교(diffing)를 통해 변화 감지
-4. 실제 DOM에 최소한의 변경만 적용 (commit phase)
-
-### Render Phase vs Commit Phase
-
-- **Render Phase**: 변경된 상태를 기반으로 새로운 VDOM 생성 및 변경 사항 계산
-- **Commit Phase**: 실제 DOM 업데이트, `ref` 연결, 라이프사이클 메서드(`componentDidMount`, `useEffect`) 실행 등 수행
-
-> React는 이 두 단계로 나누어 효율적인 렌더링과 최적화를 도모한다.
-
----
-
-## 2. Virtual DOM & Diffing
-
-### Virtual DOM이란?
-Virtual DOM은 React가 컴포넌트의 UI를 메모리 상에서 객체 형태로 표현한 트리 구조다. 이 구조는 실제 DOM과 유사한 형태로 구성되지만, 실제 브라우저의 DOM을 직접 다루지 않고 메모리에서 처리함으로써 렌더링 성능을 크게 개선할 수 있다.
-
-```tsx
-const element = <div>Hello</div>;
-```
-
-React 내부에선 다음과 같이 객체로 변환된다:
+Virtual DOM은 React가 컴포넌트의 UI 구조를 메모리 상에서 JavaScript 객체 트리로 표현한 구조이다. 컴포넌트가 반환하는 JSX는 결국 `React.createElement()` 호출을 통해 React Element 객체로 변환되며, 이 객체들로 구성된 트리가 Virtual DOM을 이룬다.
 
 ```js
 {
   type: 'div',
   props: {
-    children: 'Hello'
+    id: 'container',
+    children: [
+      {
+        type: 'h1',
+        props: {
+          children: 'Hello'
+        }
+      },
+      {
+        type: 'p',
+        props: {
+          children: 'World'
+        }
+      }
+    ]
   }
 }
 ```
 
-이러한 객체는 React Element라고도 하며, Virtual DOM의 기본 단위가 된다. React는 이 구조를 기반으로 상태 변화 시 어떤 부분이 바뀌었는지 판단한다.
+위와 같은 구조가 메모리에 생성되며, React는 상태 변경이 발생할 때마다 새로운 Virtual DOM을 생성하고, 이전 Virtual DOM과 비교(diffing)하여 실제 DOM에 반영할 변경 사항만 추출한다.
 
-### 실제 DOM과의 차이점
 
-| 항목 | Virtual DOM | 실제 DOM |
-|------|-------------|-----------|
-| 생성 위치 | 메모리 상 | 브라우저 내부 |
-| 접근 속도 | 빠름 | 상대적으로 느림 |
-| 조작 방식 | 변화된 부분만 계산 후 일괄 반영 | 직접 수정 |
-| 렌더링 주체 | React 내부 알고리즘 | 브라우저 엔진 |
+## 2. Virtual DOM의 역할
 
-Virtual DOM은 단순히 UI를 표현하기 위한 데이터 구조이기 때문에 조작이 훨씬 빠르고, 브라우저가 아닌 React가 이를 제어한다는 점이 핵심이다.
+- 컴포넌트가 렌더링될 때마다 새로운 Virtual DOM을 생성
+- 이전 Virtual DOM과 비교하여 변경 사항을 계산 (Diffing)
+- 변경된 부분만 실제 DOM에 반영 (Commit)
+- DOM 조작 최소화를 통한 성능 최적화
 
-### Diffing 알고리즘
-React는 상태가 바뀔 때마다 새롭게 생성된 Virtual DOM과 이전 Virtual DOM을 비교하여 변화된 부분만 감지하고 실제 DOM에 최소한의 변경을 반영한다. 이 비교 과정이 바로 **Diffing**, 그리고 이 과정을 포함한 전체 흐름을 **Reconciliation(조정)** 이라고 부른다.
 
-#### 비교 규칙 (Heuristic 기반 최적화)
-1. **다른 태그 타입**: 이전 노드 제거, 새 노드 삽입 (전체 교체)
-2. **key가 다름**: 리스트 항목을 전부 새로 렌더링 (React는 key를 기준으로 노드를 추적)
-3. **같은 타입 + 같은 key**: props 비교 후 변경 사항만 반영
+## 3. Virtual DOM 내부 구조
 
-이러한 규칙은 O(n^3)의 트리 비교 비용을 O(n) 수준으로 줄이는 데 큰 역할을 한다.
+React의 Virtual DOM은 React Element들의 트리이다. 각 노드는 다음과 같은 속성을 가진다:
 
-```jsx
-<ul>
-  {items.map(item => (
-    <li key={item.id}>{item.name}</li>
-  ))}
-</ul>
+- `type`: 태그 이름 (예: 'div'), 혹은 컴포넌트 함수/클래스
+- `key`: 동일 계층 내에서 엘리먼트 구분용 고유값
+- `props`: 엘리먼트의 속성과 자식 노드 정보
+
+이러한 React Element를 기반으로 React는 Fiber Node를 생성하여 렌더링을 수행한다. (Fiber 구조는 별도 정리)
+
+
+## 4. 상태 변경 이후 흐름
+
+1. 상태 변경 함수(`setState`, `setCount`, etc.) 호출
+2. 해당 컴포넌트와 하위 컴포넌트가 다시 실행되어 새로운 React Element 생성
+3. React Element → Virtual DOM으로 구성
+4. 이전 Virtual DOM과 새로운 Virtual DOM을 비교 (Diffing)
+5. 변경 사항을 Update Queue에 등록
+6. Commit Phase에서 DOM에 실제 반영
+
+
+## 5. Diffing 알고리즘
+
+React는 효율적인 비교를 위해 다음과 같은 휴리스틱을 기반으로 동작한다:
+
+- 동일 레벨의 노드끼리만 비교한다 (트리 구조 전체 재귀 탐색은 하지 않음)
+- 서로 다른 타입의 노드는 완전히 새로 생성하고 기존 노드는 제거한다
+- 동일한 타입의 노드는 props를 비교하여 변경 사항을 추적한다
+- 리스트 구조에서는 key를 기준으로 항목의 변경 여부를 판단한다
+
+### 예외 및 최적화 규칙
+- 텍스트 노드 변경 시: 텍스트만 교체
+- DOM 노드 재사용 가능 시: props만 변경
+- 리스트 재정렬 시: key가 없으면 순서 기반으로 비교하여 비효율 발생
+
+
+## 6. Key의 의미와 역할
+
+key는 동일 계층에서 항목을 식별하기 위한 값이다. 특히 배열로 구성된 children을 가진 컴포넌트에서는 key가 없으면 index 기반으로 비교가 수행되어 불필요한 마운트/언마운트가 발생한다.
+
+```tsx
+{items.map(item => (
+  <li key={item.id}>{item.name}</li>
+))}
 ```
 
-위와 같이 key를 명시하면 리스트 업데이트 시 최소 렌더링만 일어나게 된다.
+key는 다음과 같은 기준으로 설정되어야 한다:
+- 각 항목을 유일하게 식별할 수 있는 값
+- 배열의 순서(index)는 가급적 피함
 
-### VDOM이 필요한 이유
-- **DOM 조작은 느리다**: 특히 많은 엘리먼트가 존재할 경우 렌더링 비용이 급증
-- **여러 변경을 한 번에 처리**: batching을 통해 불필요한 연속 업데이트 방지
-- **플랫폼 독립성 확보**: React Native, Server-side Rendering에서도 동일한 VDOM 구조를 활용할 수 있음
 
-### 내부 동작 흐름
-1. 상태 변화로 인해 컴포넌트 재렌더링 트리거
-2. React는 해당 컴포넌트를 루트로 새로운 VDOM 생성
-3. 이전 VDOM과 새로운 VDOM을 비교(Diffing)
-4. 차이를 DOM Update Queue에 저장
-5. Commit Phase에서 해당 Queue를 순회하며 실제 DOM에 반영
+## 7. 실제 반영 과정
 
-이 과정을 통해 React는 최대한 효율적으로 변화된 UI만 브라우저에 반영하며, 불필요한 리렌더링을 방지한다.
+- 변경된 Virtual DOM 트리를 기반으로 React는 Fiber 트리 상에서 변경 플래그를 설정
+- 변경 플래그가 있는 노드만을 대상으로 DOM Update Queue를 생성
+- Commit Phase에서 이 Queue를 순회하며 실제 DOM에 패치
+- 이 과정에서 ref 연결, effect 실행 등도 함께 처리됨
 
----
 
-## 3. Fiber 구조
+## 8. Virtual DOM의 장점 요약
 
-### Fiber란?
-React 16부터 도입된 새로운 렌더링 엔진으로, 기존의 stack-based 렌더링 한계를 극복하기 위해 등장했다. Fiber는 렌더링 단위를 '작게 쪼개서' 수행함으로써 더 부드러운 사용자 경험을 제공한다.
-
-### 기존 렌더링 방식의 문제점
-- 모든 컴포넌트 렌더링이 한 번에 동기적으로 수행됨
-- 작업이 길어지면 브라우저 이벤트 처리나 애니메이션 응답이 늦어짐
-- 스크롤 멈춤, 프레임 드랍 등의 문제 발생 가능
-
-### Fiber의 도입으로 가능한 것들
-- **렌더링 작업 중단 가능**
-- **중단된 지점부터 재개 가능**
-- **우선순위 기반 처리 (e.g. 사용자 입력 먼저 처리)**
-- **타임 슬라이싱(Time Slicing)으로 프레임 유지율 향상**
-
-### Fiber 구조 내부
-Fiber는 Virtual DOM과 유사하지만 더 많은 정보를 포함한다:
-
-- `type`: 컴포넌트 타입
-- `key`: 엘리먼트 식별용
-- `props`: 현재 props
-- `stateNode`: 해당 컴포넌트 인스턴스 or DOM 노드
-- `return`, `child`, `sibling`: 부모-자식 관계
-- `alternate`: 이전 렌더링 결과 (Double Buffering)
-
-이 구조 덕분에 현재 작업 중인 트리와 이전 트리를 병렬로 유지하며 렌더링 흐름을 세밀하게 제어할 수 있다.
-
-### Fiber의 장점
-- 작업 분할 및 중단/재개 가능 → 메인 스레드 점유 최소화
-- 우선순위 스케줄링 → UX 향상 (e.g. 키 입력 응답 빠르게)
-- 향후 기능 (e.g. Concurrent Mode, Suspense, Transition 등) 지원 기반
-
-### Fiber의 단점
-- 구조 복잡도 상승
-- 디버깅 난이도 상승 (DevTools로도 완전히 추적하기 어려움)
-
-### 확인 방법
-React DevTools에서 컴포넌트 하나하나가 Fiber 단위로 트리화되어 있는 것을 볼 수 있다. 특히 Profiler 탭을 통해 렌더링 시간, 작업 중단 여부 등을 시각적으로 확인할 수 있다.
-
----
-
-## 마무리: React 렌더링을 이해한다는 것
-
-React의 렌더링 구조는 단순한 UI 변경 그 이상이다. 
-렌더링 흐름, Virtual DOM의 효율성, 그리고 Fiber를 통한 스케줄링까지 이해한다면 다음과 같은 개발 이점을 얻을 수 있다:
-
-- 성능 최적화의 핵심 포인트를 파악 가능
-- 불필요한 렌더링 방지 전략 수립 가능 (e.g. memo, key 최적화)
-- React 내부 동작에 대한 깊은 이해로 디버깅 역량 향상
-
-이해한 내용을 실제 프로젝트에 적용하면서, 컴포넌트가 어떤 시점에, 왜 렌더링되는지를 분석해보는 습관이 필요하다. 그래야 진짜로 "React를 안다"고 할 수 있다.
-
+- DOM 조작 횟수를 줄여 렌더링 성능 최적화
+- 상태 변경 → UI 반영 과정이 일관되고 예측 가능함
+- 플랫폼 독립적 구조 (React Native, SSR 등과 동일한 렌더링 원리 사용 가능)
+- 선언형 UI와 잘 맞는 구조 (함수형 스타일에 적합)
